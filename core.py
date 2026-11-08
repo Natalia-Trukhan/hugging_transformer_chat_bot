@@ -21,7 +21,7 @@ class ConversationHistory:
             'role': 'user',
             'content': text_user,
         })
-        self.control_history()
+
 
     def add_response(self, text_bot: str) -> None:
         # Append assistant response to history and check if history control is needed
@@ -33,11 +33,14 @@ class ConversationHistory:
 
     def get_messages(self) -> List[Dict[str, str]]:
         # Prepare the full message payload including system prompt and history
+        history_of_conversation = self.history
+        if len(history_of_conversation) > self.START_HISTORY_MESSAGES + self.END_HISTORY_MESSAGES:
+            history_of_conversation = self.history[:ConversationHistory.START_HISTORY_MESSAGES] + self.history[-ConversationHistory.END_HISTORY_MESSAGES:]
         message = [{
-            'role': 'system',
-            'content': self.system_prompt,
-        }]
-        message.extend(self.history)
+                'role': 'system',
+                'content': self.system_prompt,
+            }]
+        message.extend(history_of_conversation)
         return message
 
     def control_history(self) -> None:
@@ -49,16 +52,32 @@ class ConversationHistory:
 
 
 class Bot:
-    def __init__(self, name_model: str = "Qwen/Qwen3-1.7B", system_info: str = "system_prompt.txt") -> None:
+    def __init__(self, name_model: str, system_info: str = "system_prompt.txt") -> None:
         # Read system prompt from the configuration file
         with open(system_info, "r", encoding='utf-8') as file:
             system_prompt = file.read().strip()
+
+        self.name_model = name_model
 
         # Initialize the conversation history manager
         self.history_manager = ConversationHistory(system_prompt)
 
         # Set up device, tokenizer, and model
         self.device, self.tokenizer, self.model = self.prepare_model_and_device(name_model)
+
+    @property
+    def name_model(self) -> str:
+        return self.__name_model
+
+    @name_model.setter
+    def name_model(self, name_model: str) -> None:
+        self.__name_model = self.validate_name_model(name_model)
+
+    def validate_name_model(self, name_model: str) -> str:
+        if not name_model:
+            raise ValueError("Model name cannot be empty.")
+        return name_model
+
 
     def prepare_model_and_device(self, model_name):
         # Determine the compute device (GPU if available, otherwise CPU)
